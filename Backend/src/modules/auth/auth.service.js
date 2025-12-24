@@ -2,7 +2,8 @@ const db = require("../../config/db");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
-exports.login = async (email, password) => {
+exports.login = async (credentials) => {
+  const { email, password } = credentials;
   const result = await db.query("SELECT * FROM users WHERE email = $1", [
     email,
   ]);
@@ -10,17 +11,16 @@ exports.login = async (email, password) => {
   if (!user) {
     throw new Error("User not found");
   }
-  const match = await bcrypt.compare(password, user.password);
-  if (!match) {
-    throw new Error("Invalid Password");
+  const passwordMatch = await bcrypt.compare(password, user.password);
+  if (!passwordMatch) {
+    throw new Error("Invalid password");
   }
-
   const token = jwt.sign(
-    { id: user.id, role_id: user.role_id },
-    process.env.JWT_SECRET
+    { id: user.id, email: user.email, name: user.name },
+    process.env.JWT_SECRET,
+    { expiresIn: "1h" }
   );
-
-  return { token };
+  return { token, user: { id: user.id, email: user.email, name: user.name } };
 };
 
 exports.register = async (userData) => {

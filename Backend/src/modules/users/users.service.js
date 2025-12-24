@@ -1,4 +1,5 @@
 const db = require("../../config/db");
+const bcrypt = require("bcrypt");
 
 exports.getUsers = async () => {
   const result = await db.query("SELECT * FROM users ORDER BY id ASC");
@@ -9,9 +10,14 @@ exports.createUsers = async (data) => {
   if (!role_id || !name || !password || !email || !status) {
     throw new Error("All fields are required");
   }
+  const saltRounds = 10;
+  const hashedPassword = await bcrypt.hash(password, saltRounds);
+  if (typeof password !== "string" || password.length < 6) {
+    throw new Error("Password must be at least 6 characters long");
+  }
   const result = await db.query(
     "INSERT INTO users (role_id, name, password, email, status) VALUES ($1, $2, $3, $4, $5) RETURNING *",
-    [role_id, name, password, email, status]
+    [role_id, name, hashedPassword, email, status]
   );
   return result.rows[0];
 };

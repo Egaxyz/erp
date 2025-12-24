@@ -3,9 +3,11 @@ const router = express.Router();
 const controller = require("./users.controller");
 const permissionController = require("./permission/permission.controller");
 const rolesController = require("./role/role.controller");
+const auth = require("../../middleware/auth.middleware");
+const permit = require("../../middleware/permission.middleware");
 
+router.post("/", auth, permit("make_users"), controller.createUsers);
 router.get("/", controller.getUsers);
-router.post("/", controller.createUsers);
 router.put("/:id", controller.updateUsers);
 router.delete("/:id", controller.deleteUsers);
 

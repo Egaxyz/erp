@@ -5,7 +5,7 @@ exports.login = async (req, res) => {
     const result = await service.login(req.body);
     res.status(200).json(result);
   } catch (error) {
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: error.message || "Internal server error" });
   }
 };
 exports.register = async (req, res) => {
