@@ -24,7 +24,7 @@ exports.updateUsers = async (req, res) => {
     res.status(200).json(users);
   } catch (error) {
     console.log(error);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: error.message || "Internal server error" });
   }
 };
 exports.deleteUsers = async (req, res) => {
@@ -33,6 +33,6 @@ exports.deleteUsers = async (req, res) => {
     res.status(200).json(users);
   } catch (error) {
     console.log(error);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: error.message || "Internal server error" });
   }
 };
