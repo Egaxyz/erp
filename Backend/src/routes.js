@@ -5,6 +5,7 @@ const authRoutes = require("./modules/auth/auth.route");
 const supplierRoutes = require("./modules/suppliers/supplier.route");
 const itemsRoutes = require("./modules/items/items.route");
 const usersRoutes = require("./modules/users/users.route");
+const transactionRoutes = require("./modules/transaction/transaction.route");
 
 router.use("/auth", authRoutes);
 
@@ -18,5 +19,6 @@ router.use("/users", usersRoutes);
 router.use("/users/role", usersRoutes);
 router.use("/users/role-permission", usersRoutes);
 router.use("/users/permission", usersRoutes);
+router.use("/transaction", transactionRoutes);
 
 module.exports = router;
