@@ -2,6 +2,10 @@ const jwt = require("jsonwebtoken");
 
 module.exports = (req, res, next) => {
   const authHeader = req.headers.authorization;
+
+  console.log("=== AUTH MIDDLEWARE ===");
+  console.log("Authorization Header:", authHeader);
+
   if (!authHeader) {
     return res.status(401).json({ message: "No token provided" });
   }
@@ -13,9 +17,12 @@ module.exports = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // { id, email, name }
+    req.user = decoded;
+
+    console.log("✅ User authenticated:", req.user);
     next();
-  } catch {
+  } catch (error) {
+    console.error("❌ JWT Error:", error.message);
     return res.status(401).json({ message: "Invalid token" });
   }
 };
