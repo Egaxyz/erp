@@ -36,3 +36,12 @@ exports.borrowItem = async (req, res) => {
     });
   }
 };
+exports.transactionDetail = async (req, res) => {
+  try {
+    const result = await service.transactionDetail();
+    res.status(200).json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+};

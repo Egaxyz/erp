@@ -7,17 +7,18 @@ exports.getTransaction = async () => {
 exports.borrowItem = async (data, authUser) => {
   const { borrower_id, trans_code, borrow_date, return_date, items } = data;
 
-  // if (
-  //   !authUser?.id ||
-  //   !borrower_id ||
-  //   !trans_code ||
-  //   !borrow_date ||
-  //   !return_date ||
-  //   !items ||
-  //   !items.length
-  // ) {
-  //   throw new Error("Fields are required");
-  // }
+  const missingFields = [];
+
+  if (!authUser?.id) missingFields.push("authUser.id");
+  if (!borrower_id) missingFields.push("borrower_id");
+  if (!borrow_date) missingFields.push("borrow_date");
+  if (!return_date) missingFields.push("return_date");
+  if (!items) missingFields.push("items");
+  if (items && !items.length) missingFields.push("items (array is empty)");
+
+  if (missingFields.length > 0) {
+    throw new Error(`Missing required fields: ${missingFields.join(", ")}`);
+  }
   const created_by = authUser.id;
   const client = await db.connect();
 
@@ -84,4 +85,10 @@ exports.borrowItem = async (data, authUser) => {
   } finally {
     client.release();
   }
+};
+exports.transactionDetail = async () => {
+  const result = await db.query(
+    "SELECT * FROM transaction_item ORDER BY id ASC"
+  );
+  return result.rows;
 };
