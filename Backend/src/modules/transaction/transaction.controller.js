@@ -54,3 +54,12 @@ exports.approveTransaction = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+exports.rejectTransaction = async (req, res) => {
+  try {
+    const result = await service.rejectTransaction(req.params.id, req.user);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+};

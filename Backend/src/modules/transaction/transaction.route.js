@@ -18,4 +18,11 @@ router.put(
   permit("approve_transaction"),
   controller.approveTransaction
 );
+router.put(
+  "/reject/:id",
+  auth,
+  permit("reject_transaction"),
+  controller.rejectTransaction
+);
+
 module.exports = router;

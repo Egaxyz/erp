@@ -103,7 +103,7 @@ exports.approveTransaction = async (id, authUser) => {
 
   const result = await db.query(
     `UPDATE transactions 
-     SET approved_by = $1,
+     SET verified_by = $1,
          trans_status = 'approved'
      WHERE id = $2 
      RETURNING *`,
@@ -118,5 +118,34 @@ exports.approveTransaction = async (id, authUser) => {
     throw new Error("Transaction not found");
   }
 
+  return result.rows[0];
+};
+exports.rejectTransaction = async (id, authUser) => {
+  console.log("\n=== REJECT TRANSACTION DEBUG ===");
+  console.log("Received ID:", id, "Type:", typeof id);
+  console.log("Received authUser:", authUser);
+  console.log("authUser.id:", authUser?.id, "Type:", typeof authUser?.id);
+
+  const rejected_by = authUser.id;
+
+  console.log("rejected_by value:", rejected_by);
+
+  console.log("\nExecuting query with params:", [rejected_by, id]);
+
+  const result = await db.query(
+    `UPDATE transactions
+    SET verified_by = $1,
+        trans_status = 'not_approved'
+    WHERE id = $2
+    RETURNING *`,
+    [rejected_by, id]
+  );
+
+  console.log("Query executed. Row count:", result.rowCount);
+  console.log("Returned data:", result.rows[0]);
+  console.log("=================================\n");
+  if (result.rowCount === 0) {
+    throw new Error("Transaction not found");
+  }
   return result.rows[0];
 };
