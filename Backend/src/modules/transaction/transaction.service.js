@@ -5,7 +5,7 @@ exports.getTransaction = async () => {
   return result.rows;
 };
 exports.borrowItem = async (data, authUser) => {
-  const { borrower_id, trans_code, borrow_date, return_date, items } = data;
+  const { borrower_id, borrow_date, return_date, items } = data;
 
   const missingFields = [];
 
@@ -25,7 +25,6 @@ exports.borrowItem = async (data, authUser) => {
   try {
     await client.query("BEGIN");
 
-    // 1️⃣ Insert ke transaction (header)
     const transResult = await client.query(
       `
       INSERT INTO transactions (
@@ -56,7 +55,6 @@ exports.borrowItem = async (data, authUser) => {
     const transId = transResult.rows[0].id;
     const transCode = transResult.rows[0].transCode;
 
-    // 2️⃣ Insert ke transaction_item (detail)
     for (const item of items) {
       await client.query(
         `
@@ -91,4 +89,34 @@ exports.transactionDetail = async () => {
     "SELECT * FROM transaction_item ORDER BY id ASC"
   );
   return result.rows;
+};
+exports.approveTransaction = async (id, authUser) => {
+  console.log("\n=== APPROVE TRANSACTION DEBUG ===");
+  console.log("Received ID:", id, "Type:", typeof id);
+  console.log("Received authUser:", authUser);
+  console.log("authUser.id:", authUser?.id, "Type:", typeof authUser?.id);
+
+  const approved_by = authUser.id;
+  console.log("approved_by value:", approved_by);
+
+  console.log("\nExecuting query with params:", [approved_by, id]);
+
+  const result = await db.query(
+    `UPDATE transactions 
+     SET approved_by = $1,
+         trans_status = 'approved'
+     WHERE id = $2 
+     RETURNING *`,
+    [approved_by, id]
+  );
+
+  console.log("Query executed. Row count:", result.rowCount);
+  console.log("Returned data:", result.rows[0]);
+  console.log("=================================\n");
+
+  if (result.rowCount === 0) {
+    throw new Error("Transaction not found");
+  }
+
+  return result.rows[0];
 };

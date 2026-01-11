@@ -12,5 +12,10 @@ router.get(
   permit("read_trans_details"),
   controller.transactionDetail
 );
-
+router.put(
+  "/approve/:id",
+  auth,
+  permit("approve_transaction"),
+  controller.approveTransaction
+);
 module.exports = router;
