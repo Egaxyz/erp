@@ -5,14 +5,13 @@ exports.getTransaction = async () => {
   return result.rows;
 };
 exports.borrowItem = async (data, authUser) => {
-  const { borrower_id, borrow_date, return_date, items } = data;
+  const { borrower_id, borrow_date, items } = data;
 
   const missingFields = [];
 
   if (!authUser?.id) missingFields.push("authUser.id");
   if (!borrower_id) missingFields.push("borrower_id");
   if (!borrow_date) missingFields.push("borrow_date");
-  if (!return_date) missingFields.push("return_date");
   if (!items) missingFields.push("items");
   if (items && !items.length) missingFields.push("items (array is empty)");
 
@@ -32,7 +31,6 @@ exports.borrowItem = async (data, authUser) => {
         borrower_id,
         trans_code,
         borrow_date,
-        return_date,
         trans_status
       )
       VALUES (
@@ -44,28 +42,62 @@ exports.borrowItem = async (data, authUser) => {
           LPAD(nextval('trans_code')::text, 4, '0')
         ),
         $3,
-        $4,
         'pending'
       )
       RETURNING id
       `,
-      [created_by, borrower_id, borrow_date, return_date]
+      [created_by, borrower_id, borrow_date]
     );
 
     const transId = transResult.rows[0].id;
     const transCode = transResult.rows[0].transCode;
 
     for (const item of items) {
+      const stockResult = await client.query(
+        `
+    SELECT i_stock
+    FROM items
+    WHERE id = $1
+    FOR UPDATE
+    `,
+        [item.item_id]
+      );
+
+      if (stockResult.rowCount === 0) {
+        throw new Error(`Item dengan id ${item.item_id} tidak ditemukan`);
+      }
+
+      const currentStock = stockResult.rows[0].i_stock;
+
+      if (currentStock <= 0) {
+        throw new Error(`Stok item ${item.item_id} habis`);
+      }
+
+      if (currentStock < item.qty) {
+        throw new Error(
+          `Stok item ${item.item_id} kurang. Tersedia: ${currentStock}, diminta: ${item.qty}`
+        );
+      }
+
       await client.query(
         `
-        INSERT INTO transaction_item (
-          trans_id,
-          item_id,
-          qty
-        )
-        VALUES ($1, $2, $3)
-        `,
+    INSERT INTO transaction_item (
+      trans_id,
+      item_id,
+      qty
+    )
+    VALUES ($1, $2, $3)
+    `,
         [transId, item.item_id, item.qty]
+      );
+
+      await client.query(
+        `
+    UPDATE items
+    SET i_stock = i_stock - $1
+    WHERE id = $2
+    `,
+        [item.qty, item.item_id]
       );
     }
 
@@ -104,7 +136,9 @@ exports.approveTransaction = async (id, authUser) => {
   const result = await db.query(
     `UPDATE transactions 
      SET verified_by = $1,
-         trans_status = 'approved'
+         is_returned = false,
+         trans_status = 'approved',
+         return_date = CURRENT_DATE
      WHERE id = $2 
      RETURNING *`,
     [approved_by, id]
