@@ -63,3 +63,11 @@ exports.rejectTransaction = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+exports.returnItems = async (req, res) => {
+  try {
+    const result = await service.returnItems(req.params.id, req.user);
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};

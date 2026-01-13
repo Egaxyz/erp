@@ -138,7 +138,6 @@ exports.approveTransaction = async (id, authUser) => {
      SET verified_by = $1,
          is_returned = false,
          trans_status = 'approved',
-         return_date = CURRENT_DATE
      WHERE id = $2 
      RETURNING *`,
     [approved_by, id]
@@ -182,4 +181,106 @@ exports.rejectTransaction = async (id, authUser) => {
     throw new Error("Transaction not found");
   }
   return result.rows[0];
+};
+exports.returnItems = async (id, authUser) => {
+  const return_by = authUser.id;
+
+  if (!id) {
+    throw new Error("Transaction ID is required");
+  }
+
+  const client = await db.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const transCheck = await client.query(
+      `SELECT id, trans_status, is_returned 
+       FROM transactions 
+       WHERE id = $1`,
+      [id]
+    );
+
+    if (transCheck.rowCount === 0) {
+      throw new Error("Transaction not found");
+    }
+
+    const transaction = transCheck.rows[0];
+
+    if (transaction.is_returned) {
+      throw new Error("Items already returned");
+    }
+
+    if (transaction.trans_status !== "approved") {
+      throw new Error("Cannot return items from non-approved transaction");
+    }
+
+    const borrowedItems = await client.query(
+      `SELECT ti.item_id, ti.qty, i.i_name, i.i_stock
+       FROM transaction_item ti
+       JOIN items i ON ti.item_id = i.id
+       WHERE ti.trans_id = $1`,
+      [id]
+    );
+
+    if (borrowedItems.rowCount === 0) {
+      throw new Error("No items found in this transaction");
+    }
+
+    console.log("\n=== RETURNING ITEMS ===");
+    console.log("Transaction ID:", id);
+    console.log("Items to return:", borrowedItems.rows);
+
+    for (const item of borrowedItems.rows) {
+      const currentStock = item.i_stock;
+      const returnQty = item.qty;
+      const newStock = currentStock + returnQty;
+
+      console.log(`\nItem: ${item.i_name} (ID: ${item.item_id})`);
+      console.log(`  Current stock: ${currentStock}`);
+      console.log(`  Returned qty: ${returnQty}`);
+      console.log(`  New stock: ${newStock}`);
+
+      await client.query(
+        `UPDATE items
+         SET i_stock = i_stock + $1
+         WHERE id = $2`,
+        [returnQty, item.item_id]
+      );
+    }
+
+    const transResult = await client.query(
+      `UPDATE transactions
+       SET is_returned = true,
+           return_date = CURRENT_DATE
+       WHERE id = $1
+       RETURNING *`,
+      [id]
+    );
+
+    await client.query("COMMIT");
+
+    console.log("\n✅ Items returned successfully");
+    console.log("======================\n");
+
+    return {
+      message: "Items returned successfully",
+      transaction_id: id,
+      transaction_code: transResult.rows[0].trans_code,
+      returned_by: return_by,
+      return_date: transResult.rows[0].return_date,
+      items_returned: borrowedItems.rowCount,
+      items: borrowedItems.rows.map((item) => ({
+        item_id: item.item_id,
+        item_name: item.i_name,
+        qty: item.qty,
+      })),
+    };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error returning items:", error);
+    throw error;
+  } finally {
+    client.release();
+  }
 };

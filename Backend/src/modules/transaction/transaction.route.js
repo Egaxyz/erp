@@ -24,5 +24,6 @@ router.put(
   permit("reject_transaction"),
   controller.rejectTransaction
 );
+router.put("/return/:id", auth, permit("return_items"), controller.returnItems);
 
 module.exports = router;
