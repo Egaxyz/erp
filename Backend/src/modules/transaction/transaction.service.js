@@ -90,15 +90,6 @@ exports.borrowItem = async (data, authUser) => {
     `,
         [transId, item.item_id, item.qty]
       );
-
-      await client.query(
-        `
-    UPDATE items
-    SET i_stock = i_stock - $1
-    WHERE id = $2
-    `,
-        [item.qty, item.item_id]
-      );
     }
 
     await client.query("COMMIT");
@@ -129,29 +120,73 @@ exports.approveTransaction = async (id, authUser) => {
   console.log("authUser.id:", authUser?.id, "Type:", typeof authUser?.id);
 
   const approved_by = authUser.id;
+  const client = await db.connect();
   console.log("approved_by value:", approved_by);
 
   console.log("\nExecuting query with params:", [approved_by, id]);
+  try {
+    await client.query("BEGIN");
 
-  const result = await db.query(
-    `UPDATE transactions 
-     SET verified_by = $1,
-         is_returned = false,
-         trans_status = 'approved',
-     WHERE id = $2 
-     RETURNING *`,
-    [approved_by, id]
-  );
+    const result = await client.query(
+      `UPDATE transactions 
+       SET verified_by = $1,
+           is_returned = false,
+           trans_status = 'approved'
+       WHERE id = $2 
+       RETURNING *`,
+      [approved_by, id]
+    );
+    const itemsResult = await client.query(
+      `
+      SELECT 
+        ti.item_id,
+        ti.qty,
+        i.i_stock
+      FROM transaction_item ti
+      JOIN items i ON i.id = ti.item_id
+      WHERE ti.trans_id = $1
+      FOR UPDATE
+      `,
+      [id]
+    );
 
-  console.log("Query executed. Row count:", result.rowCount);
-  console.log("Returned data:", result.rows[0]);
-  console.log("=================================\n");
+    if (itemsResult.rowCount === 0) {
+      throw new Error("Transaction items not found");
+    }
 
-  if (result.rowCount === 0) {
-    throw new Error("Transaction not found");
+    // 2. Validasi & kurangi stok
+    for (const item of itemsResult.rows) {
+      if (item.i_stock < item.qty) {
+        throw new Error(
+          `Stok item ${item.item_id} tidak cukup. Tersedia: ${item.i_stock}, diminta: ${item.qty}`
+        );
+      }
+
+      await client.query(
+        `
+        UPDATE items
+        SET i_stock = i_stock - $1
+        WHERE id = $2
+        `,
+        [item.qty, item.item_id]
+      );
+    }
+
+    console.log("Query executed. Row count:", result.rowCount);
+    console.log("Returned data:", result.rows[0]);
+    console.log("=================================\n");
+
+    if (result.rowCount === 0) {
+      throw new Error("Transaction not found");
+    }
+    await client.query("COMMIT");
+    return result.rows[0];
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
   }
-
-  return result.rows[0];
 };
 exports.rejectTransaction = async (id, authUser) => {
   console.log("\n=== REJECT TRANSACTION DEBUG ===");
